@@ -118,6 +118,6 @@ This project is licensed under the **MIT License**.
 
 ## 👨‍💻 Author
 
-Built with ❤️ by **\[Yazide Salhi]**
-👉 Portfolio: \[https://yadsashel.github.io/My-Portfolio/]
-👉 LinkedIn: \[https://www.linkedin.com/in/elyazid-salhi-8a57a42b4/]
+Built with ❤️ by **Yazide Salhi**
+👉 Portfolio: https://yadsashel.github.io/My-Portfolio/
+👉 LinkedIn: https://www.linkedin.com/in/elyazid-salhi-8a57a42b4/
