@@ -1,1 +1,6 @@
+# React dependencies
+node_modules/
+build/
+
+# Env files
 .env
