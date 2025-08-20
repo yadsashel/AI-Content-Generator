@@ -20,7 +20,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY", "SUPER_SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = os.getenv("FRONTEND_URL")
 
 # Initialize OpenRouter client
 openrouter_client = OpenAI(
