@@ -197,3 +197,7 @@ async def generate_fast(request: PromptRequest):
     except Exception as e:
         print("OpenRouter error:", e)
         return {"error": str(e)}
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))  # Render will inject PORT
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
