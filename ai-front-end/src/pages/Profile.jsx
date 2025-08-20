@@ -13,7 +13,7 @@ export default function Profile() {
     document.title = "Profile";
 
     if (token) {
-      fetch('${import.meta.env.VITE_BACKEND_URL}/api/profile', {
+      fetch( `${import.meta.env.VITE_BACKEND_URL}/api/profile`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -40,7 +40,7 @@ export default function Profile() {
   const handleUpdate = (e) => {
     e.preventDefault();
 
-    fetch('${import.meta.env.VITE_BACKEND_URL}/api/profile', {
+    fetch( `${import.meta.env.VITE_BACKEND_URL}/api/profile`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
