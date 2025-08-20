@@ -60,7 +60,7 @@ export default function Dashboard() {
     setLoading(true);
     setGeneratedContent("Generating...");
     try {
-      const res = await fetch('${import.meta.env.VITE_BACKEND_URL}/api/generate_fast', {
+      const res = await fetch( `${import.meta.env.VITE_BACKEND_URL}/api/generate_fast`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
