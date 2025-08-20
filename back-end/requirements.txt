@@ -11,3 +11,4 @@ pyjwt
 python-multipart
 python-jose[cryptography]
 requests
+openai
