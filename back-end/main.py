@@ -115,7 +115,8 @@ def register(user: UserRegister):
         (user.email, hashed_password)
     )
     conn.commit()
-    return {"message": "User registered successfully!", "email": user.email}
+    return {"message": "User registered successfully!", "email": user.email
+    }
 
 @app.post("/api/login", response_model=Token)
 def login(user: UserRegister):
