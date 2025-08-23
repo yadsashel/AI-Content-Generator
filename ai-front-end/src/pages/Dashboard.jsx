@@ -1,11 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6 } },
-};
-
 // =======================
 // Sample Prompts per type
 // =======================
@@ -37,11 +32,20 @@ const samplePrompts = {
   ]
 };
 
+// =======================
+// Motion Variants
+// =======================
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6 } },
+};
+
 export default function Dashboard() {
   const [contentType, setContentType] = useState("Social Media Post");
   const [prompt, setPrompt] = useState("");
   const [generatedContent, setGeneratedContent] = useState("");
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState([]); // Chat history for future UX
 
   useEffect(() => {
     document.title = "Dashboard";
@@ -60,7 +64,7 @@ export default function Dashboard() {
     setLoading(true);
     setGeneratedContent("Generating...");
     try {
-      const res = await fetch( `${process.env.REACT_APP_BACKEND_URL}/api/generate_fast`, {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/generate_fast`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
@@ -72,8 +76,11 @@ export default function Dashboard() {
       }
 
       const data = await res.json();
-      // ✅ FIX: use data.output instead of data.answer
-      setGeneratedContent(data.output || "No content returned");
+      const output = data.output || "No content returned";
+
+      setGeneratedContent(output);
+      setHistory(prev => [{ prompt, output, type: contentType, id: Date.now() }, ...prev]); // Save history
+
     } catch (err) {
       setGeneratedContent("❌ Failed to generate content: " + err.message);
     } finally {
@@ -86,13 +93,15 @@ export default function Dashboard() {
     alert("Copied to clipboard!");
   };
 
+  const handleClearHistory = () => setHistory([]);
+
   return (
     <div className="bg-[#0B1020] text-white min-h-screen">
+      {/* ======================= Hero Section ======================= */}
       <section className="max-w-7xl mx-auto px-6 py-20">
         <motion.div
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, amount: 0.3 }}
+          animate="show"
           className="grid md:grid-cols-2 gap-10 items-center"
         >
           <motion.div variants={fadeUp} className="space-y-6">
@@ -108,10 +117,14 @@ export default function Dashboard() {
             </p>
           </motion.div>
 
-          {/* ====== GENERATED CONTENT BOX ====== */}
           <motion.div variants={fadeUp} className="relative">
-            <div className="relative rounded-3xl border border-white/10 bg-gradient-to-tr from-white/10 to-white/5 p-5 backdrop-blur-xl shadow-2xl">
-              <div className="rounded-2xl bg-[#0B1020]/60 border border-white/10 p-4 min-h-[120px] break-words">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="relative rounded-3xl border border-white/10 bg-gradient-to-tr from-white/10 to-white/5 p-5 backdrop-blur-xl shadow-2xl"
+            >
+              <div className="rounded-2xl bg-[#0B1020]/60 border border-white/10 p-4 max-h-[300px] overflow-auto break-words">
                 <p className="text-sm text-white/80 whitespace-pre-wrap">
                   {generatedContent || "Your AI-generated content will appear here!"}
                 </p>
@@ -124,18 +137,18 @@ export default function Dashboard() {
                   Copy
                 </button>
               )}
-            </div>
+            </motion.div>
           </motion.div>
         </motion.div>
       </section>
 
-      {/* ===== CONTENT GENERATOR ===== */}
+      {/* ======================= Content Generator ======================= */}
       <section className="border-t border-white/10 bg-[#0C1226]">
         <div className="max-w-3xl mx-auto px-6 py-20">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
             className="rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 backdrop-blur-xl"
           >
             <h3 className="text-2xl font-bold mb-4">Generate your content</h3>
@@ -177,6 +190,37 @@ export default function Dashboard() {
               {loading ? "Generating..." : "Generate"}
             </button>
           </motion.div>
+
+          {/* ======================= Chat History (Future UX) ======================= */}
+          {history.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold">History</h3>
+                <button
+                  onClick={handleClearHistory}
+                  className="px-3 py-1 bg-red-500 rounded-xl font-semibold hover:bg-red-400 transition"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              <div className="max-h-96 overflow-auto space-y-3">
+                {history.map(item => (
+                  <div key={item.id} className="rounded-xl bg-[#0B1020]/60 p-3 border border-white/10">
+                    <p className="text-sm text-white/70 mb-2">
+                      <strong>Prompt ({item.type}):</strong> {item.prompt}
+                    </p>
+                    <p className="text-sm text-white/80 whitespace-pre-wrap">{item.output}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </div>
       </section>
     </div>
