@@ -12,8 +12,17 @@ export default function Register() {
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const isValidGmail = (email) => {
+    // Gmail only, block disposable emails
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+    return gmailRegex.test(email);
+  };
+
   const handleRegister = async () => {
+    if (!isValidGmail(email)) return alert("Please use a valid Gmail address.");
     if (password !== confirm) return alert("Passwords do not match!");
+    if (password.length < 8) return alert("Password must be at least 8 characters.");
+
     setLoading(true);
     try {
       const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/register`, {
@@ -21,14 +30,12 @@ export default function Register() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
 
+      const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Registration failed");
 
       alert(`Registered successfully: ${data.email}`);
-      setEmail("");
-      setPassword("");
-      setConfirm("");
+      setEmail(""); setPassword(""); setConfirm("");
     } catch (err) {
       alert(err.message);
     } finally {
@@ -36,9 +43,7 @@ export default function Register() {
     }
   };
 
-  useEffect(() => {
-    document.title = "Register";
-  }, []);
+  useEffect(() => { document.title = "Register"; }, []);
 
   return (
     <div className="bg-[#0B1020] min-h-screen flex items-center justify-center text-white px-6">
@@ -51,39 +56,29 @@ export default function Register() {
         <h2 className="text-3xl font-bold mb-6 text-center">Create Account</h2>
         <div className="space-y-4">
           <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="email" placeholder="Gmail"
+            value={email} onChange={(e) => setEmail(e.target.value)}
             className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
           />
           <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            type="password" placeholder="Password"
+            value={password} onChange={(e) => setPassword(e.target.value)}
             className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
           />
           <input
-            type="password"
-            placeholder="Confirm Password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
+            type="password" placeholder="Confirm Password"
+            value={confirm} onChange={(e) => setConfirm(e.target.value)}
             className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-fuchsia-400"
           />
           <button
-            onClick={handleRegister}
-            disabled={loading}
+            onClick={handleRegister} disabled={loading}
             className="w-full rounded-xl bg-fuchsia-500 px-5 py-3 font-semibold text-white shadow-lg hover:bg-fuchsia-600 transition disabled:opacity-50"
           >
             {loading ? "Registering..." : "Register"}
           </button>
         </div>
         <div className="mt-6 text-center text-white/60">
-          Already have an account?{" "}
-          <a href="/login" className="text-fuchsia-400 hover:underline">
-            Login
-          </a>
+          Already have an account? <a href="/login" className="text-fuchsia-400 hover:underline">Login</a>
         </div>
       </motion.div>
     </div>

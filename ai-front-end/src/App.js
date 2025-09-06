@@ -6,6 +6,8 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Navbar from "./components/Navbar";
+import Pricing from "./pages/Pricing";
+import FAQ from "./pages/FAQ";
 
 export default function App() {
   // State to track login status
@@ -20,6 +22,8 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/pricing" element={<Pricing />} />      
+        <Route path="faq" element={<FAQ />} /> 
       </Routes>
     </BrowserRouter>
   );
