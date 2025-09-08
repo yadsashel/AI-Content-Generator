@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Copy, Edit, Trash, Share2 } from "lucide-react";
+import { Copy, Edit, Trash } from "lucide-react";
 
 const samplePrompts = {
   "Social Media Post": [
@@ -133,12 +133,12 @@ export default function App() {
   const handleSelectChat = (chatId) => {
     const chat = history.find(c => c.id === chatId);
     setActiveChat(chat);
-    setPrompt(""); // Clear prompt when selecting an existing chat
+    setPrompt("");
   };
 
   const handleNewChat = () => {
     setActiveChat(null);
-    setPrompt(""); // Clear prompt for a new chat
+    setPrompt("");
   };
 
   const handleGenerate = async () => {
@@ -147,15 +147,9 @@ export default function App() {
     setLoading(true);
 
     const userMessage = { role: "user", content: prompt };
-
-    let currentChatMessages = [];
-    if (activeChat) {
-      currentChatMessages = [...activeChat.messages];
-    }
-
+    const currentChatMessages = activeChat ? [...activeChat.messages] : [];
     const tempMessages = [...currentChatMessages, userMessage, { role: "assistant", content: "" }];
     
-    // Update the active chat and history optimistically
     const tempChat = activeChat
       ? { ...activeChat, messages: tempMessages }
       : { id: "temp", title: prompt.substring(0, 30), messages: tempMessages, createdAt: new Date() };
@@ -191,29 +185,23 @@ export default function App() {
       const decoder = new TextDecoder();
       let fullResponse = "";
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        fullResponse += chunk;
-
-        // Update the active chat and history with the new chunk
-        setHistory(prevHistory => 
-          prevHistory.map(chat => 
-            chat.id === activeChat?.id 
-              ? { ...chat, messages: activeChat.messages.slice(0, -1).concat([{ role: "assistant", content: fullResponse }]) }
-              : chat
-          )
-        );
+      // Use a single, reliable state update function
+      const updateContent = (newChunk) => {
+        fullResponse += newChunk;
         setActiveChat(prev => {
           if (!prev) return null;
           const updatedMessages = prev.messages.slice(0, -1).concat([{ role: "assistant", content: fullResponse }]);
           return { ...prev, messages: updatedMessages };
         });
+      };
+      
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        updateContent(chunk);
       }
 
-      // After stream completes, fetch posts to get the final ID and content
       fetchUserInfo();
       fetchPosts();
 
@@ -307,7 +295,6 @@ export default function App() {
   };
 
   const handleShare = (platform, content) => {
-    const text = `Check out this AI-generated content I created:\n\n${content}`;
     let shareUrl = "";
 
     switch (platform) {
@@ -351,7 +338,6 @@ export default function App() {
   
   return (
     <div className="bg-[#0B1020] text-white min-h-screen flex">
-      {/* Sidebar for Chat History */}
       <div className="flex-none w-80 bg-[#171A2E] p-4 border-r border-white/10 flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">My Chats</h2>
@@ -390,9 +376,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Chat/Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Chat History Display */}
         <div className="flex-grow p-6 overflow-y-auto space-y-6" ref={chatContainerRef}>
           {!activeChat ? (
             <motion.div initial="hidden" animate="show" className="text-center space-y-4 pt-20">
@@ -437,7 +421,6 @@ export default function App() {
           )}
         </div>
 
-        {/* Input area at the bottom */}
         <div className="flex-none p-6 bg-[#171A2E] border-t border-white/10">
           <div className="flex items-center space-x-4 max-w-4xl mx-auto">
             <select
