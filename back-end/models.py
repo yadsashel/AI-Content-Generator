@@ -53,7 +53,16 @@ class Transaction(Base):
 class Post(Base):
     __tablename__ = "posts"
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(200), nullable=False)
-    content = Column(Text, nullable=False)
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Chat/Content fields
+    title = Column(String(200), default="Untitled Chat")   # user can rename
+    messages = Column(Text, nullable=False)  # store chat history as JSON string
+
+    # Social
+    shared_linkedin = Column(Boolean, default=False)
+    shared_twitter = Column(Boolean, default=False)
+    shared_facebook = Column(Boolean, default=False)
+
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -8,6 +8,7 @@ import Profile from "./pages/Profile";
 import Navbar from "./components/Navbar";
 import Pricing from "./pages/Pricing";
 import FAQ from "./pages/FAQ";
+import ResetPassword from "./pages/ResetPassword"; 
 
 export default function App() {
   // State to track login status
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/pricing" element={<Pricing />} />      
         <Route path="faq" element={<FAQ />} /> 
+        <Route path="/resetpassword" element={<ResetPassword />} />
       </Routes>
     </BrowserRouter>
   );
