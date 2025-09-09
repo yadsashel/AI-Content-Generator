@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Copy, Edit, Trash, Image as ImageIcon } from "lucide-react";
 
@@ -118,8 +118,6 @@ const MarkdownRenderer = ({ content }) => {
 
 
 export default function App() {
-  // This is the variable that caused the issue on Netlify
-  // It's a good practice to check if it's defined and provide a clear error if not.
   const backendUrl = process.env.REACT_APP_BACKEND_URL;
 
   const [contentType, setContentType] = useState("AnythingElse");
@@ -136,27 +134,9 @@ export default function App() {
   const [showSidebar, setShowSidebar] = useState(false);
   const chatContainerRef = useRef(null);
   const [showImagePrompt, setShowImagePrompt] = useState(false);
-  const [lastGeneratedPostId, setLastGeneratedPostId] = useState(null);
+  // Removed unused variables 'lastGeneratedPostId' and 'setLastGeneratedPostId'
 
-  useEffect(() => {
-    document.title = "Dashboard";
-    // Check if the backend URL is set before making API calls
-    if (!backendUrl) {
-      console.error("REACT_APP_BACKEND_URL is not set. Please configure it in your Netlify environment variables.");
-      // You might want to display a user-facing error message here
-      return;
-    }
-    fetchUserInfo();
-    fetchPosts();
-  }, [backendUrl]); // Added backendUrl to dependency array
-
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [activeChat]);
-
-  const fetchUserInfo = async () => {
+  const fetchUserInfo = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${backendUrl}/api/me`, {
@@ -170,9 +150,9 @@ export default function App() {
     } catch (err) {
       console.error("Failed to fetch user info:", err);
     }
-  };
+  }, [backendUrl]);
 
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(`${backendUrl}/api/posts`, {
@@ -191,7 +171,23 @@ export default function App() {
     } catch (err) {
       console.error("Failed to fetch posts:", err);
     }
-  };
+  }, [backendUrl]);
+
+  useEffect(() => {
+    document.title = "Dashboard";
+    if (!backendUrl) {
+      console.error("REACT_APP_BACKEND_URL is not set. Please configure it in your Netlify environment variables.");
+      return;
+    }
+    fetchUserInfo();
+    fetchPosts();
+  }, [backendUrl, fetchUserInfo, fetchPosts]);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [activeChat]);
 
   const handleSelectChat = (chatId) => {
     const chat = history.find(c => c.id === chatId);
@@ -271,7 +267,6 @@ export default function App() {
         updateContent(chunk);
       }
 
-      // Check the final message content to decide if image prompt should be shown
       const finalChat = activeChat ? { ...activeChat, messages: activeChat.messages.slice(0, -1).concat([{ role: "assistant", content: fullResponse }]) } : tempChat;
       const lastMessage = finalChat.messages[finalChat.messages.length - 1];
       if (lastMessage && lastMessage.content.includes("Do you want to create an image")) {
@@ -325,7 +320,6 @@ export default function App() {
           return { ...prev, messages: updatedMessages };
         });
         
-        // Update the backend with the new image URL
         await fetch(`${backendUrl}/api/posts/${activeChat.id}`, {
           method: "PUT",
           headers: {
@@ -504,7 +498,6 @@ export default function App() {
   
   return (
     <div className="bg-[#0B1020] text-white min-h-screen flex flex-col md:flex-row">
-      {/* Backdrop for mobile */}
       {showSidebar && (
         <div 
           onClick={() => setShowSidebar(false)} 
@@ -512,7 +505,6 @@ export default function App() {
         ></div>
       )}
 
-      {/* Sidebar for chat history */}
       <div className={`fixed inset-y-0 left-0 w-80 bg-[#171A2E] z-50 transition-transform duration-300 transform ${showSidebar ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 md:flex-none md:w-80 md:p-4`}>
         <div className="flex items-center justify-between p-4 mb-4">
           <h2 className="text-xl font-bold">My Chats</h2>
@@ -550,7 +542,6 @@ export default function App() {
             ))
           )}
         </div>
-        {/* This is the section with the Plan and Credits information */}
         <div className="mt-auto p-4 border-t border-white/10">
           <p className="text-sm">Plan: <strong>{userPlan}</strong></p>
           <p className="text-sm">Credits: <strong>{credits}</strong></p>
@@ -558,7 +549,6 @@ export default function App() {
       </div>
 
       <div className="flex-1 flex flex-col">
-        {/* Mobile header with menu button */}
         <div className="flex-none p-4 md:hidden flex items-center bg-[#171A2E] border-b border-white/10">
           <button onClick={() => setShowSidebar(true)} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -566,7 +556,6 @@ export default function App() {
           <h1 className="text-lg font-bold ml-4">{activeChat?.title || "New Chat"}</h1>
         </div>
 
-        {/* Main chat area */}
         <div className="flex-grow p-6 overflow-y-auto space-y-6" ref={chatContainerRef}>
           {!activeChat ? (
             <motion.div initial="hidden" animate="show" className="text-center space-y-4 pt-20">
@@ -593,7 +582,7 @@ export default function App() {
                       <MarkdownRenderer content={msg.content} />
                       {msg.imageUrl && (
                         <div className="mt-4">
-                          <img src={msg.imageUrl} alt="Generated Image" className="rounded-lg w-full max-w-xs mx-auto" />
+                          <img src={msg.imageUrl} alt="Generated visual based on the assistant's post content" className="rounded-lg w-full max-w-xs mx-auto" />
                         </div>
                       )}
                       {imageLoading && index === activeChat.messages.length - 1 && (
@@ -649,7 +638,6 @@ export default function App() {
           )}
         </div>
 
-        {/* Input box */}
         <div className="flex-none p-6 bg-[#171A2E] border-t border-white/10">
           <div className="flex items-center space-x-4 max-w-4xl mx-auto">
             <select
