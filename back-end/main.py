@@ -318,7 +318,7 @@ async def generate_stream(request: PromptRequest, current_user: User = Depends(g
     # Add a system prompt to guide the AI's response style, based on the user's request
     system_prompt = {
         "role": "system",
-        "content": "You are a highly professional, well-organized, and smart assistant. Your responses should be structured like a polished article or blog post, using Markdown for clear headings (like ## and ###), bolding for emphasis (**bold text**), and logical paragraph breaks. Do not include raw markdown symbols in the final rendered output. The formatting should be clean and professional, just as a polished piece of writing would appear. The user is expecting a perfect, structured, and visually appealing response. Based on the user's query, use appropriate icons and emojis to enhance the answer, as long as it maintains a professional tone."
+        "content": "You are a highly professional, well-organized, and smart assistant. Your responses should be structured like a polished article or blog post, using Markdown for clear headings (like ## and ###), bolding for emphasis (**bold text**), and logical paragraph breaks. The user is expecting a perfect, structured, and visually appealing response. Based on the user's query, use appropriate icons and emojis to enhance the answer, as long as it maintains a professional tone."
     }
     messages_to_send.insert(0, system_prompt)
 
@@ -326,7 +326,7 @@ async def generate_stream(request: PromptRequest, current_user: User = Depends(g
         full_response = ""
         try:
             response = openrouter_client.chat.completions.create(
-                model="openai/gpt-4o",
+                model="mistralai/mistral-small-3.2-24b-instruct:free",
                 messages=messages_to_send,
                 max_tokens=2048,
                 temperature=0.7,
@@ -341,6 +341,8 @@ async def generate_stream(request: PromptRequest, current_user: User = Depends(g
             print(f"Streaming error: {e}")
             yield "❌ Error: Something went wrong with the AI generation.".encode("utf-8")
         finally:
+            # We need a new database session for the final update to avoid issues
+            # with the session used by FastAPI's dependency injection
             new_db = next(get_db())
             try:
                 user_to_update = new_db.query(User).filter(User.id == current_user.id).first()
@@ -350,11 +352,12 @@ async def generate_stream(request: PromptRequest, current_user: User = Depends(g
                     print("Error: User or Post not found in new session during update.")
                     return
 
+                # Append the full user and assistant messages to the chat history
                 messages = json.loads(post_to_update.messages)
                 messages.append({"role": "user", "content": request.prompt})
                 messages.append({"role": "assistant", "content": full_response})
                 post_to_update.messages = json.dumps(messages)
-
+                
                 if user_to_update.plan in ("starter", "pro", "free"):
                     user_to_update.credit_remaining -= 1
                 elif user_to_update.plan == "flexible":
@@ -374,17 +377,17 @@ async def generate_stream(request: PromptRequest, current_user: User = Depends(g
 
 # ------------------- ROUTES: SOCIAL MEDIA -------------------
 # This is a placeholder for social media posting logic.
-# In a real application, you would need to implement OAuth 2.0 flows for each platform
+# it would need to implement OAuth 2.0 flows for each platform
 # to securely authenticate and get user-specific access tokens.
 @app.post("/api/social/post")
 def post_to_social(request: SocialPostRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Here you would add the logic to interact with each social media platform's API
+    # Here it would add the logic to interact with each social media platform's API
     # based on the 'platform' field in the request.
     try:
         # For demonstration purposes, we'll just check the platform and return a success message.
         if request.platform == "facebook":
             # facebook_api.post(request.content)
-            # You would need to add error handling and proper API calls here.
+            # it would need to add error handling and proper API calls here.
             message = f"✅ Content successfully posted to Facebook for user {current_user.email}."
         elif request.platform == "twitter":
             # twitter_api.post_tweet(request.content)

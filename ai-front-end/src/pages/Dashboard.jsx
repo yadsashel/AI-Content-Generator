@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Copy, Edit, Trash } from "lucide-react";
+import { Copy, Edit, Trash, Image as ImageIcon } from "lucide-react";
 
+// Mock data for development
 const samplePrompts = {
   "Social Media Post": [
     "Write a short, catchy social media post promoting a new Moroccan Amlou product in 2–3 sentences.",
@@ -68,10 +69,59 @@ const Modal = ({ isOpen, title, message, onConfirm, onCancel }) => {
   );
 };
 
+// New component for the floating cursor effect
+const TypingEffectCursor = () => {
+  return (
+    <span className="inline-block w-2 h-4 ml-1 bg-white animate-pulse"></span>
+  );
+};
+
+const MarkdownRenderer = ({ content }) => {
+  // Split the content into lines
+  const lines = content.split('\n');
+  const boldRegex = /\*\*(.*?)\*\*/g;
+  const listRegex = /^- /;
+
+  return (
+    <div className="prose prose-invert max-w-none">
+      {lines.map((line, index) => {
+        let formattedLine = line;
+
+        // Check for headings first
+        if (line.startsWith('### ')) {
+          formattedLine = <h3 key={index} className="text-lg font-semibold mt-4 mb-2">{line.substring(4)}</h3>;
+        } else if (line.startsWith('## ')) {
+          formattedLine = <h2 key={index} className="text-xl font-bold mt-4 mb-2">{line.substring(3)}</h2>;
+        } else if (listRegex.test(line)) {
+          // Handle bullet points
+          const listItem = line.substring(2);
+          const boldParts = listItem.split(boldRegex).map((part, i) =>
+            i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+          );
+          formattedLine = <li key={index} className="pl-4 mt-1">{boldParts}</li>;
+        } else {
+          // Handle regular text and bolding
+          const boldParts = formattedLine.split(boldRegex).map((part, i) =>
+            i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+          );
+          if (line.trim() === '') {
+            formattedLine = <br key={index} />;
+          } else {
+            formattedLine = <p key={index} className="mb-2">{boldParts}</p>;
+          }
+        }
+        return formattedLine;
+      })}
+    </div>
+  );
+};
+
+
 export default function App() {
   const [contentType, setContentType] = useState("AnythingElse");
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [userPlan, setUserPlan] = useState("free");
   const [credits, setCredits] = useState(0);
@@ -79,7 +129,10 @@ export default function App() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [chatToDelete, setChatToDelete] = useState(null);
   const [copiedMessage, setCopiedMessage] = useState('');
+  const [showSidebar, setShowSidebar] = useState(false);
   const chatContainerRef = useRef(null);
+  const [showImagePrompt, setShowImagePrompt] = useState(false);
+  const [lastGeneratedPostId, setLastGeneratedPostId] = useState(null);
 
   useEffect(() => {
     document.title = "Dashboard";
@@ -134,22 +187,25 @@ export default function App() {
     const chat = history.find(c => c.id === chatId);
     setActiveChat(chat);
     setPrompt("");
+    setShowSidebar(false);
   };
 
   const handleNewChat = () => {
     setActiveChat(null);
     setPrompt("");
+    setShowSidebar(false);
   };
 
   const handleGenerate = async () => {
     if (!prompt || loading) return;
 
     setLoading(true);
+    setShowImagePrompt(false);
 
     const userMessage = { role: "user", content: prompt };
     const currentChatMessages = activeChat ? [...activeChat.messages] : [];
     const tempMessages = [...currentChatMessages, userMessage, { role: "assistant", content: "" }];
-    
+
     const tempChat = activeChat
       ? { ...activeChat, messages: tempMessages }
       : { id: "temp", title: prompt.substring(0, 30), messages: tempMessages, createdAt: new Date() };
@@ -185,7 +241,6 @@ export default function App() {
       const decoder = new TextDecoder();
       let fullResponse = "";
 
-      // Use a single, reliable state update function
       const updateContent = (newChunk) => {
         fullResponse += newChunk;
         setActiveChat(prev => {
@@ -194,12 +249,19 @@ export default function App() {
           return { ...prev, messages: updatedMessages };
         });
       };
-      
+
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
         updateContent(chunk);
+      }
+
+      // Check the final message content to decide if image prompt should be shown
+      const finalChat = activeChat ? { ...activeChat, messages: activeChat.messages.slice(0, -1).concat([{ role: "assistant", content: fullResponse }]) } : tempChat;
+      const lastMessage = finalChat.messages[finalChat.messages.length - 1];
+      if (lastMessage && lastMessage.content.includes("Do you want to create an image")) {
+        setShowImagePrompt(true);
       }
 
       fetchUserInfo();
@@ -217,6 +279,82 @@ export default function App() {
     }
   };
 
+  const handleGenerateImage = async () => {
+    setImageLoading(true);
+    setShowImagePrompt(false);
+    if (!activeChat) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const lastAssistantMessage = activeChat.messages[activeChat.messages.length - 1];
+
+      if (!lastAssistantMessage || lastAssistantMessage.role !== 'assistant') {
+        throw new Error("No assistant message to generate an image from.");
+      }
+
+      const imageUrl = await generateImage(lastAssistantMessage.content, token);
+
+      if (imageUrl) {
+        setActiveChat(prev => {
+          if (!prev) return null;
+          const updatedMessages = prev.messages.map((msg, index) => {
+            if (index === prev.messages.length - 1) {
+              return { ...msg, imageUrl: imageUrl };
+            }
+            return msg;
+          });
+          return { ...prev, messages: updatedMessages };
+        });
+        
+        // Update the backend with the new image URL
+        await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/posts/${activeChat.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ messages: JSON.stringify(activeChat.messages.map((msg, index) => {
+            if (index === activeChat.messages.length - 1) {
+              return { ...msg, imageUrl: imageUrl };
+            }
+            return msg;
+          })) }),
+        });
+        
+      } else {
+        alert("Failed to generate image.");
+      }
+    } catch (error) {
+      console.error("Error generating image:", error);
+      alert("Error generating image: " + error.message);
+    } finally {
+      setImageLoading(false);
+    }
+  };
+
+  const generateImage = async (textPrompt, token) => {
+    try {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/generate_image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ prompt: textPrompt })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server responded with status: ${res.status}`);
+      }
+
+      const data = await res.json();
+      return data.imageUrl;
+    } catch (error) {
+      console.error("Image generation API call failed:", error);
+      return null;
+    }
+  };
+  
   const handleRenameChat = async (e, chatId) => {
     e.stopPropagation();
     const newTitle = window.prompt("Enter new chat name:");
@@ -234,8 +372,8 @@ export default function App() {
       });
 
       if (res.ok) {
-        setHistory(prevHistory => 
-          prevHistory.map(chat => 
+        setHistory(prevHistory =>
+          prevHistory.map(chat =>
             chat.id === chatId ? { ...chat, title: newTitle } : chat
           )
         );
@@ -329,7 +467,7 @@ export default function App() {
           Twitter
         </button>
         <button onClick={() => handleShare('linkedin', content)} className="flex items-center space-x-1 px-3 py-2 text-sm bg-blue-700 rounded-md text-white hover:bg-blue-800 transition">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M21 0H3C1.343 0 0 1.343 0 3v18c0 1.657 1.343 3 3 3h18c1.657 0 3-1.343 3-3V3c0-1.657-1.343-3-3-3zm-10.985 19h-2.915v-9h2.915v9zm-1.449-10.378c-.961 0-1.742-.78-1.742-1.742 0-.961.78-1.742 1.742-1.742.962 0 1.743.781 1.743 1.742 0 .962-.781 1.742-1.743 1.742zm11.449 10.378h-2.898v-4.502c0-.532-.01-.983-.019-1.332-.017-.591-.017-1.025.597-1.025.613 0 1.57.513 1.57 2.032v4.827h-2.915v-4.22c0-1.536-1.018-2.657-2.316-2.657-1.296 0-1.898.887-1.898 2.592v4.285h-2.915v-9h2.915v1.277c.414-.658.918-1.427 2.05-1.427 1.43 0 2.548.881 3.208 2.508v-.004c.062.176.104.37.132.585h.001l.006.027c.026.115.039.229.052.345.012.116.023.23.034.346.011.116.02.23.029.345.009.115.018.23.027.345.009.115.017.23.025.345.008.115.015.229.022.345.007.116.014.23.021.345.006.115.012.23.018.344.005.115.01.229.015.344.004.115.008.229.011.344.003.114.006.229.008.344.002.115.003.229.004.344v.004h-.001c-.001.002-.002.003-.004.005-.002.002-.004.003-.006.004-.002.002-.004.003-.006.005-.002.002-.003.004-.005.005-.001.001-.002.002-.003.002z"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M21 0H3C1.343 0 0 1.343 0 3v18c0 1.657 1.343 3 3 3h18c1.657 0 3-1.343 3-3V3c0-1.657-1.343-3-3-3zm-10.985 19h-2.915v-9h2.915v9zm-1.449-10.378c-.961 0-1.742-.78-1.742-1.742 0-.961.78-1.742 1.742-1.742.962 0 1.743.781 1.743 1.742 0 .962-.781 1.742-1.743 1.742zm11.449 10.378h-2.898v-4.502c0-.532-.01-.983-.019-1.332-.017-.591-.017-1.025.597-1.025.613 0 1.57.513 1.57 2.032v4.827h-2.915v-4.22c0-1.536-1.018-2.657-2.316-2.657-1.296 0-1.898.887-1.898 2.592v4.285h-2.915v-9h2.915v1.277c.414-.658.918-1.427 2.05-1.427 1.43 0 2.548.881 3.208 2.508v-.004c.062.176.104.37.132.585h.001l.006.027c.026.115.039.229.052.345.012.116.023.23.034.346.011.116.02.23.029.345.009.115.018.23.027.345.009.115.017.23.025.345.008.115.015.229.022.345.007.116.014.23.021.345.006.115.012.23.018.344.005.115.01.229.015.344.004.115.008.229.011.344.003.114.006.229.008.344.002.115.003.229.004.344v.004h-.001c-.001.002-.002.003-.004.005-.002.002-.004.003-.006.004-.002.002-.004.003-.006.005-.001.001-.002.002-.003.002z"/></svg>
           LinkedIn
         </button>
       </div>
@@ -337,15 +475,29 @@ export default function App() {
   };
   
   return (
-    <div className="bg-[#0B1020] text-white min-h-screen flex">
-      <div className="flex-none w-80 bg-[#171A2E] p-4 border-r border-white/10 flex flex-col">
-        <div className="flex items-center justify-between mb-4">
+    <div className="bg-[#0B1020] text-white min-h-screen flex flex-col md:flex-row">
+      {/* Backdrop for mobile */}
+      {showSidebar && (
+        <div 
+          onClick={() => setShowSidebar(false)} 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+        ></div>
+      )}
+
+      {/* Sidebar for chat history */}
+      <div className={`fixed inset-y-0 left-0 w-80 bg-[#171A2E] z-50 transition-transform duration-300 transform ${showSidebar ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 md:flex-none md:w-80 md:p-4`}>
+        <div className="flex items-center justify-between p-4 mb-4">
           <h2 className="text-xl font-bold">My Chats</h2>
-          <button onClick={handleNewChat} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-          </button>
+          <div className="flex space-x-2">
+            <button onClick={handleNewChat} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+            <button onClick={() => setShowSidebar(false)} className="md:hidden p-2 rounded-full bg-white/10 hover:bg-white/20 transition">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
-        <div className="flex-grow overflow-y-auto space-y-2">
+        <div className="flex-grow overflow-y-auto px-4 space-y-2">
           {history.length === 0 ? (
             <p className="text-white/50 text-sm">No chat history. Start a new chat!</p>
           ) : (
@@ -370,13 +522,23 @@ export default function App() {
             ))
           )}
         </div>
-        <div className="mt-auto pt-4 border-t border-white/10">
+        {/* This is the section with the Plan and Credits information */}
+        <div className="mt-auto p-4 border-t border-white/10">
           <p className="text-sm">Plan: <strong>{userPlan}</strong></p>
           <p className="text-sm">Credits: <strong>{credits}</strong></p>
         </div>
       </div>
 
       <div className="flex-1 flex flex-col">
+        {/* Mobile header with menu button */}
+        <div className="flex-none p-4 md:hidden flex items-center bg-[#171A2E] border-b border-white/10">
+          <button onClick={() => setShowSidebar(true)} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <h1 className="text-lg font-bold ml-4">{activeChat?.title || "New Chat"}</h1>
+        </div>
+
+        {/* Main chat area */}
         <div className="flex-grow p-6 overflow-y-auto space-y-6" ref={chatContainerRef}>
           {!activeChat ? (
             <motion.div initial="hidden" animate="show" className="text-center space-y-4 pt-20">
@@ -398,12 +560,39 @@ export default function App() {
               >
                 <div className={`p-4 rounded-lg max-w-3xl ${msg.role === 'user' ? 'bg-[#2D335A] text-white' : 'bg-[#1D2036] text-white/80'}`}>
                   <p className="font-semibold capitalize mb-1">{msg.role}</p>
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                  {msg.role === 'assistant' ? (
+                    <>
+                      <MarkdownRenderer content={msg.content} />
+                      {msg.imageUrl && (
+                        <div className="mt-4">
+                          <img src={msg.imageUrl} alt="Generated Image" className="rounded-lg w-full max-w-xs mx-auto" />
+                        </div>
+                      )}
+                      {imageLoading && index === activeChat.messages.length - 1 && (
+                        <div className="flex justify-center items-center mt-4">
+                          <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
+                        </div>
+                      )}
+                      {index === activeChat.messages.length - 1 && showImagePrompt && (
+                        <div className="flex space-x-2 mt-4 items-center">
+                          <p className="text-sm text-white/70">
+                            Do you want to create a fitting image for this post?
+                          </p>
+                          <button onClick={handleGenerateImage} className="flex items-center space-x-1 px-3 py-2 text-sm bg-purple-600 rounded-md text-white hover:bg-purple-700 transition">
+                            <ImageIcon size={16} />
+                            Generate Image
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                  )}
                   {msg.role === 'assistant' && (
                     <div className="flex space-x-2 mt-2">
                       <button 
                         onClick={() => handleCopy(msg.content)} 
-                        className="flex items-center space-x-1 p-1 text-white/70 hover:text-white transition"
+                        className="relative flex items-center space-x-1 p-1 text-white/70 hover:text-white transition"
                       >
                         <Copy size={16} />
                         {copiedMessage && (
@@ -419,8 +608,20 @@ export default function App() {
               </motion.div>
             ))
           )}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="p-4 rounded-lg bg-[#1D2036] text-white/80 max-w-3xl">
+                <p className="font-semibold capitalize mb-1">assistant</p>
+                <div className="flex items-center">
+                  <p>Thinking</p>
+                  <TypingEffectCursor />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* Input box */}
         <div className="flex-none p-6 bg-[#171A2E] border-t border-white/10">
           <div className="flex items-center space-x-4 max-w-4xl mx-auto">
             <select
@@ -445,7 +646,7 @@ export default function App() {
               disabled={loading}
               className="p-3 bg-white text-slate-900 rounded-xl font-semibold hover:bg-gray-200 transition disabled:opacity-50"
             >
-              {loading ? "..." : <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>}
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
             </button>
           </div>
         </div>
