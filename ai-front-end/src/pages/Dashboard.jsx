@@ -118,6 +118,10 @@ const MarkdownRenderer = ({ content }) => {
 
 
 export default function App() {
+  // This is the variable that caused the issue on Netlify
+  // It's a good practice to check if it's defined and provide a clear error if not.
+  const backendUrl = process.env.REACT_APP_BACKEND_URL;
+
   const [contentType, setContentType] = useState("AnythingElse");
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -136,9 +140,15 @@ export default function App() {
 
   useEffect(() => {
     document.title = "Dashboard";
+    // Check if the backend URL is set before making API calls
+    if (!backendUrl) {
+      console.error("REACT_APP_BACKEND_URL is not set. Please configure it in your Netlify environment variables.");
+      // You might want to display a user-facing error message here
+      return;
+    }
     fetchUserInfo();
     fetchPosts();
-  }, []);
+  }, [backendUrl]); // Added backendUrl to dependency array
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -149,7 +159,7 @@ export default function App() {
   const fetchUserInfo = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/me`, {
+      const res = await fetch(`${backendUrl}/api/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -165,7 +175,7 @@ export default function App() {
   const fetchPosts = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/posts`, {
+      const res = await fetch(`${backendUrl}/api/posts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -198,6 +208,10 @@ export default function App() {
 
   const handleGenerate = async () => {
     if (!prompt || loading) return;
+    if (!backendUrl) {
+      console.error("Cannot generate. REACT_APP_BACKEND_URL is not configured.");
+      return;
+    }
 
     setLoading(true);
     setShowImagePrompt(false);
@@ -215,7 +229,7 @@ export default function App() {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/generate_stream`, {
+      const res = await fetch(`${backendUrl}/api/generate_stream`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -283,6 +297,11 @@ export default function App() {
     setImageLoading(true);
     setShowImagePrompt(false);
     if (!activeChat) return;
+    if (!backendUrl) {
+      console.error("Cannot generate image. REACT_APP_BACKEND_URL is not configured.");
+      setImageLoading(false);
+      return;
+    }
 
     try {
       const token = localStorage.getItem("token");
@@ -307,7 +326,7 @@ export default function App() {
         });
         
         // Update the backend with the new image URL
-        await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/posts/${activeChat.id}`, {
+        await fetch(`${backendUrl}/api/posts/${activeChat.id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -334,7 +353,7 @@ export default function App() {
 
   const generateImage = async (textPrompt, token) => {
     try {
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/generate_image`, {
+      const res = await fetch(`${backendUrl}/api/generate_image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -359,10 +378,14 @@ export default function App() {
     e.stopPropagation();
     const newTitle = window.prompt("Enter new chat name:");
     if (!newTitle) return;
+    if (!backendUrl) {
+      console.error("Cannot rename chat. REACT_APP_BACKEND_URL is not configured.");
+      return;
+    }
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/posts/${chatId}`, {
+      const res = await fetch(`${backendUrl}/api/posts/${chatId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -396,9 +419,14 @@ export default function App() {
 
   const confirmDelete = async () => {
     if (!chatToDelete) return;
+    if (!backendUrl) {
+      console.error("Cannot delete chat. REACT_APP_BACKEND_URL is not configured.");
+      setShowDeleteModal(false);
+      return;
+    }
     try {
       const token = localStorage.getItem("token");
-      await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/posts/${chatToDelete}`, {
+      await fetch(`${backendUrl}/api/posts/${chatToDelete}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
