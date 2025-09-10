@@ -104,7 +104,7 @@ SUPABASE_KEY=your_supabase_api_key
    Render will give you a backend URL like:
 https://your-backend.onrender.com
 
-markdown
+
 Copy code
 
 ---
@@ -126,14 +126,11 @@ Copy code
 4. Add your **backend API URL** from Render into Netlify Environment Variables, e.g.:
 VITE_API_URL=https://your-backend.onrender.com
 
-mathematica
+
 Copy code
 5. Deploy 🎉  
 Netlify will give you a frontend URL like:
 https://your-frontend.netlify.app
-
-yaml
-Copy code
 
 ---
 
