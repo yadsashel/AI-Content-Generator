@@ -81,25 +81,64 @@ SUPABASE_KEY=your_supabase_api_key
 
 ---
 
-## 🚀 Deployment (Fly.io)
+## 🚀 Deployment (Render + Netlify)
 
-### Deploy Backend
+### Backend Deployment (Render)
 
-```bash
-cd backend
-fly launch
-fly deploy
-```
+1. Go to [Render](https://render.com) and create a **New Web Service**.
+2. Connect your GitHub repo (or upload your backend folder).
+3. Select the `backend/` directory as the root.
+4. Configure:
+   - **Environment**: Python 3.x
+   - **Build Command**:
+     ```bash
+     pip install -r requirements.txt
+     ```
+   - **Start Command**:
+     ```bash
+     gunicorn main:app
+     ```
+     > Replace `main:app` with your FastAPI entrypoint if different.
+5. Add your environment variables in the **Render Dashboard** (`.env` values).
+6. Deploy 🎉  
+   Render will give you a backend URL like:
+https://your-backend.onrender.com
 
-### Deploy Frontend
-
-```bash
-cd frontend
-fly launch
-fly deploy
-```
+markdown
+Copy code
 
 ---
+
+### Frontend Deployment (Netlify)
+
+1. Go to [Netlify](https://netlify.com) and create a **New Site from Git**.
+2. Select the repo and choose the `frontend/` folder as your project root.
+3. Configure build settings:
+- **Build Command**:
+  ```bash
+  npm run build
+  ```
+- **Publish Directory**:
+  ```
+  dist
+  ```
+  > If you’re using Vite. If Create React App, use `build` instead.
+4. Add your **backend API URL** from Render into Netlify Environment Variables, e.g.:
+VITE_API_URL=https://your-backend.onrender.com
+
+mathematica
+Copy code
+5. Deploy 🎉  
+Netlify will give you a frontend URL like:
+https://your-frontend.netlify.app
+
+yaml
+Copy code
+
+---
+
+✅ Now your frontend (Netlify) will talk to your backend (Render).
+
 
 ## 🔮 Future Improvements
 
