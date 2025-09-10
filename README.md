@@ -104,9 +104,6 @@ SUPABASE_KEY=your_supabase_api_key
    Render will give you a backend URL like:
 https://your-backend.onrender.com
 
-
-Copy code
-
 ---
 
 ### Frontend Deployment (Netlify)
@@ -127,7 +124,7 @@ Copy code
 VITE_API_URL=https://your-backend.onrender.com
 
 
-Copy code
+
 5. Deploy 🎉  
 Netlify will give you a frontend URL like:
 https://your-frontend.netlify.app
